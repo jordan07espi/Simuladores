@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Farmacología - Mgs. Francisco Ayala</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #00b894;
+            --accent: #fdcb6e;
+            --danger: #ff7675;
+            --text: #2d3436;
+            --bg: #dfe6e9;
+            --card-bg: #ffffff;
+            --modal-overlay: rgba(45, 52, 54, 0.95);
+        }
+
+        * { box-sizing: border-box; user-select: none; outline: none; }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            color: var(--text);
+            background-image: radial-gradient(#b2bec3 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        #app-container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--card-bg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        /* --- HEADER --- */
+        header {
+            padding: 15px 30px;
+            background: white;
+            z-index: 10;
+            border-bottom: 2px solid #eee;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .title-area h1 { margin: 0; color: var(--primary); font-family: 'Poppins', sans-serif; font-size: 1.4rem; text-transform: uppercase; }
+        .title-area span { font-size: 0.9rem; color: #636e72; font-weight: bold; }
+
+        .timer-wrapper { position: relative; height: 30px; margin-top: 10px; }
+        .timer-display { position: absolute; right: 0; top: -25px; font-weight: bold; font-family: monospace; font-size: 1.2rem; }
+        .timer-track {
+            width: 100%; height: 12px; background: #eee; border-radius: 10px; overflow: hidden;
+        }
+        .timer-fill {
+            height: 100%; width: 100%;
+            background: linear-gradient(90deg, var(--secondary), var(--accent), var(--danger));
+            background-size: 200% 100%;
+            transition: width 1s linear, background-position 1s;
+        }
+
+        /* --- GRID PRINCIPAL --- */
+        .game-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr 220px; /* Paciente | Pregunta | Lifelines */
+            gap: 20px;
+            padding: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* COLUMNA PACIENTE */
+        .col-patient {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .patient-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 2px solid #f1f2f6;
+            position: relative;
+        }
+        .patient-img {
+            width: 100%; height: 250px; object-fit: cover;
+            transition: filter 0.3s;
+        }
+        .patient-info { padding: 15px; }
+        
+        .bubble {
+            background: #fff7d6;
+            padding: 15px;
+            border-radius: 15px;
+            border-left: 5px solid var(--accent);
+            font-style: italic;
+            position: relative;
+            margin-top: 10px;
+            font-size: 0.95rem;
+            color: #444;
+        }
+
+        .btn-intervene {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 5px 0 #5849be;
+            transition: transform 0.1s;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            animation: pulse 2s infinite;
+        }
+        .btn-intervene:active { transform: translateY(5px); box-shadow: none; }
+        .btn-intervene.done { background: #b2bec3; box-shadow: none; cursor: default; animation: none; }
+
+        /* COLUMNA CLÍNICA (CENTRO) */
+        .col-clinical {
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .question-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border-left: 5px solid var(--secondary);
+        }
+        .question-text { font-size: 1.15rem; font-weight: 700; line-height: 1.5; color: #2d3436; }
+
+        .options-container { display: flex; flex-direction: column; gap: 12px; }
+        
+        .option-btn {
+            background: white;
+            border: 2px solid #e0e0e0;
+            padding: 18px;
+            border-radius: 12px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 15px;
+            position: relative;
+        }
+        .option-btn:hover { border-color: var(--primary); transform: translateX(5px); background: #fdfdfd; }
+        .option-btn.disabled { opacity: 0.4; pointer-events: none; }
+        .option-letter { 
+            background: #eee; width: 30px; height: 30px; 
+            border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+            font-weight: bold; color: #555; flex-shrink: 0;
+        }
+
+        /* COLUMNA LIFELINES (DERECHA) */
+        .col-lifelines {
+            background: white;
+            border-radius: 20px;
+            padding: 15px;
+            border: 1px solid #eee;
+            display: flex; flex-direction: column; gap: 10px;
+            height: fit-content;
+        }
+        .lifeline-title {
+            text-align: center; font-weight: 800; color: var(--primary); 
+            text-transform: uppercase; font-size: 0.85rem; margin-bottom: 10px;
+        }
+        .lifeline-btn {
+            background: #fff;
+            border: 2px solid #dfe6e9;
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            display: flex; flex-direction: column; align-items: center;
+            transition: all 0.2s;
+        }
+        .lifeline-btn:hover { border-color: var(--accent); background: #fffdf5; transform: scale(1.02); }
+        .lifeline-btn.used { filter: grayscale(100%); opacity: 0.5; pointer-events: none; }
+        
+        .cost { font-size: 0.7rem; color: var(--danger); font-weight: bold; margin-top: 2px; }
+
+        /* --- MODALES --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-overlay);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Modal Psicoeducativo */
+        .modal-psycho {
+            background: white; width: 90%; max-width: 700px;
+            border-radius: 20px; padding: 30px;
+            animation: popIn 0.3s;
+            position: relative;
+        }
+        .psycho-grid { display: grid; gap: 10px; margin-top: 20px; }
+        .psycho-opt {
+            padding: 15px; border: 2px solid #eee; border-radius: 10px;
+            background: white; cursor: pointer; text-align: left; font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .psycho-opt:hover { border-color: var(--primary); background: #f4f3ff; }
+
+        /* Modal Feedback Estilo Cranium */
+        .modal-feedback {
+            background: white;
+            width: 90%; max-width: 500px;
+            border-radius: 30px;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-top: 10px solid var(--primary);
+        }
+        .fb-icon { font-size: 4rem; margin-bottom: 10px; display: block; }
+        .fb-title { font-size: 1.8rem; font-weight: 800; margin: 10px 0; color: var(--text); }
+        .fb-text { font-size: 1rem; color: #555; line-height: 1.6; margin-bottom: 25px; }
+        .fb-btn {
+            background: var(--primary); color: white; border: none;
+            padding: 12px 40px; border-radius: 50px; font-size: 1.1rem;
+            font-weight: bold; cursor: pointer; box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+            transition: transform 0.2s;
+        }
+        .fb-btn:hover { transform: scale(1.05); }
+
+        /* Modal Bibliografía */
+        .modal-biblio {
+            background: #fff; border-left: 8px solid var(--accent);
+            padding: 30px; width: 80%; max-width: 600px; border-radius: 10px;
+            animation: popIn 0.3s;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--text); color: white; text-align: right;
+            padding: 10px 20px; font-size: 0.8rem; font-weight: bold; letter-spacing: 1px;
+        }
+
+        @keyframes popIn { from{transform:scale(0.9); opacity:0;} to{transform:scale(1); opacity:1;} }
+        @keyframes bounceIn { from{transform:scale(0.5); opacity:0;} to{transform:scale(1); opacity:1;} }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+        @media (max-width: 900px) {
+            .game-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; overflow: visible; }
+            .col-lifelines { flex-direction: row; justify-content: space-around; }
+            .patient-img { height: 180px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <header>
+        <div class="header-content">
+            <div class="title-area">
+                <h1>SIMULADOR PRÁCTICO: FARMACOLOGÍA</h1>
+                <span>MGS. FRANCISCO AYALA | 3er Semestre Tecnología</span>
+            </div>
+            <button onclick="endGame(false)" style="background:var(--danger); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:bold;">Finalizar Turno</button>
+        </div>
+        <div class="timer-wrapper">
+            <div class="timer-display" id="timer-text">20:00</div>
+            <div class="timer-track"><div class="timer-fill" id="timer-bar"></div></div>
+        </div>
+    </header>
+
+    <div class="game-grid" id="game-ui">
+        <div class="col-patient">
+            <div class="patient-card">
+                <img src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80" class="patient-img" id="patient-face">
+                <div class="patient-info">
+                    <h3 style="margin:0;">María López (Post-Op)</h3>
+                    <div class="bubble" id="patient-doubt">...</div>
+                </div>
+            </div>
+            <button class="btn-intervene" id="btn-psycho" onclick="openPsycho()">
+                <span>💬</span> Intervención Verbal
+            </button>
+        </div>
+
+        <div class="col-clinical">
+            <div class="question-box">
+                <div style="display:flex; justify-content:space-between;">
+                    <small style="color:var(--primary); font-weight:bold; text-transform:uppercase;">Caso Clínico <span id="q-idx">1</span>/20</small>
+                    <small style="color:#888;">Nivel: <span id="q-level">Básico</span></small>
+                </div>
+                <div class="question-text" id="q-text">Cargando...</div>
+            </div>
+            <div class="options-container" id="options-list">
+                </div>
+        </div>
+
+        <div class="col-lifelines">
+            <div class="lifeline-title">Comodines</div>
+            
+            <button class="lifeline-btn" id="life-5050" onclick="useLifeline('5050')">
+                <span style="font-size:1.5rem">⚖️</span>
+                <strong>50 / 50</strong>
+                <span class="cost">-0.5 Pts</span>
+            </button>
+
+            <button class="lifeline-btn" id="life-biblio" onclick="useLifeline('biblio')">
+                <span style="font-size:1.5rem">📖</span>
+                <strong>Bibliografía</strong>
+                <span class="cost">-0.5 Pts</span>
+            </button>
+
+            <button class="lifeline-btn" id="life-skip" onclick="useLifeline('skip')">
+                <span style="font-size:1.5rem">⏭️</span>
+                <strong>Paso</strong>
+                <span class="cost">0 Pts (Sin sumar)</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="footer">ELABORADO: MGS. FRANCISCO AYALA</div>
+</div>
+
+<div class="modal-overlay" id="modal-start" style="display:flex;">
+    <div class="modal-feedback" style="border-top-color:var(--secondary);">
+        <h1>Guardia de Farmacología</h1>
+        <p>Bienvenido, colega. Tienes 20 minutos para gestionar el caso de María López (Post-apendicectomía).</p>
+        <ul style="text-align:left; color:#555; font-size:0.95rem; margin-bottom:20px; line-height:1.6;">
+            <li>✅ <strong>20 Preguntas</strong> de complejidad progresiva (Valoración -> Farmacología -> Complicaciones).</li>
+            <li>✅ Debes realizar la <strong>Intervención Verbal</strong> en cada turno antes de medicar.</li>
+            <li>✅ Los comodines te ayudarán, pero restan puntaje.</li>
+        </ul>
+        <button class="fb-btn" onclick="startGame()">Comenzar Turno</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-psycho">
+    <div class="modal-psycho">
+        <h2 style="color:var(--primary); margin-top:0;">🗣️ Intervención Verbal</h2>
+        <p><strong>Duda del Paciente:</strong> <span id="psycho-question">...</span></p>
+        <p style="font-size:0.9rem; color:#666;">Selecciona la respuesta más terapéutica y profesional:</p>
+        <div class="psycho-grid" id="psycho-options">
+            </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-feedback">
+    <div class="modal-feedback" id="fb-card">
+        <span class="fb-icon" id="fb-icon">🎉</span>
+        <div class="fb-title" id="fb-title">¡Correcto!</div>
+        <div class="fb-text" id="fb-desc">Explicación...</div>
+        <button class="fb-btn" onclick="nextQuestion()">Continuar</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-biblio-content">
+    <div class="modal-biblio">
+        <h3 style="color:var(--accent);">📚 Evidencia Científica</h3>
+        <p id="biblio-text" style="line-height:1.6; font-size:1rem; color:#333;">...</p>
+        <button class="fb-btn" onclick="closeBiblio()" style="margin-top:15px; font-size:0.9rem;">Entendido</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-end">
+    <div class="modal-feedback">
+        <span class="fb-icon">📋</span>
+        <div class="fb-title">Reporte Final</div>
+        <h2 style="font-size:3rem; margin:10px 0; color:var(--primary);" id="final-score">0.0/10</h2>
+        <p id="final-msg">...</p>
+        <button class="fb-btn" onclick="location.reload()">Nuevo Turno</button>
+    </div>
+</div>
+
+<script>
+    // --- IMÁGENES REACCIONES ---
+    const imgPain = "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80";
+    const imgHappy = "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&w=600&q=80";
+    const imgConcern = "https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&w=600&q=80";
+
+    // --- BASE DE DATOS DE 20 PREGUNTAS (COMPLEJIDAD ESCALADA) ---
+    // Nivel 1-5: Básico | 6-14: Intermedio | 15-20: Avanzado
+    const db = [
+        // PREGUNTA 1: Valoración
+        {
+            scenario: "María refiere dolor en fosa iliaca derecha. Antes de cualquier intervención, ¿qué debes realizar?",
+            level: "Básico",
+            options: [
+                { txt: "Administrar Paracetamol inmediatamente.", correct: false },
+                { txt: "Realizar valoración completa (ALICIA) y aplicar escala EVA.", correct: true, feed: "Correcto. La valoración objetiva (EVA) es indispensable para medir la eficacia posterior del tratamiento." },
+                { txt: "Pedirle que duerma.", correct: false },
+                { txt: "Llamar al médico sin valorar.", correct: false }
+            ],
+            doubt: "¿Es normal que me duela tanto? Siento que me quema.",
+            psycho: [
+                { txt: "Es dolor psicológico.", score: -0.1, feed: "Incorrecto. Invalidas al paciente." },
+                { txt: "Entiendo que el dolor es intenso. Voy a medirlo para darle la dosis exacta que necesita para aliviarlo.", score: 0.1, feed: "Correcto. Validas y explicas." },
+                { txt: "Aguántese un poquito.", score: -0.1, feed: "Falta de empatía." },
+                { txt: "Le voy a dormir para que no moleste.", score: -0.1, feed: "Poco ético." }
+            ],
+            biblio: "La Quinta Constante Vital: El dolor debe ser evaluado y registrado sistemáticamente usando escalas validadas (EVA 0-10) antes y después de intervenir."
+        },
+        // PREGUNTA 2: Seguridad (5 Correctos)
+        {
+            scenario: "Tienes una orden de 'Ketorolaco 30mg IV'. Al revisar la historia, notas que María es asmática. ¿Qué haces?",
+            level: "Básico",
+            options: [
+                { txt: "Administrar el medicamento lento.", correct: false },
+                { txt: "No administrar y consultar al médico por riesgo de broncoespasmo.", correct: true, feed: "Correcto. Existe sensibilidad cruzada entre AINEs y Asma (Triada de Samter)." },
+                { txt: "Cambiar la vía a oral.", correct: false },
+                { txt: "Administrar media dosis.", correct: false }
+            ],
+            doubt: "Una vez tomé aspirina y se me cerró el pecho...",
+            psycho: [
+                { txt: "No se preocupe, esto no es aspirina.", score: -0.1, feed: "Peligroso. Es un AINE también." },
+                { txt: "Gracias por decirme. Al ser asmática, este medicamento podría afectarla. Hablaré con el médico para cambiarlo por algo seguro.", score: 0.1, feed: "Excelente gestión de seguridad." },
+                { txt: "Usted no sabe de medicina.", score: -0.1, feed: "Grosero." },
+                { txt: "Probemos a ver qué pasa.", score: -0.1, feed: "Negligente." }
+            ],
+            biblio: "Seguridad Farmacológica: El Ketorolaco y otros AINEs pueden precipitar crisis asmáticas graves en pacientes sensibles a la aspirina."
+        },
+        // PREGUNTA 3: Escalera OMS
+        {
+            scenario: "El dolor es EVA 7/10 (Severo). El médico prescribe solo Ibuprofeno (Escalón 1). ¿Cuál es tu juicio profesional?",
+            level: "Básico",
+            options: [
+                { txt: "Es adecuado, el Ibuprofeno es fuerte.", correct: false },
+                { txt: "Insuficiente. Dolor severo requiere Escalón 2 (Opioide débil) o 3.", correct: true, feed: "Correcto. EVA > 6 suele requerir opioides o analgesia multimodal." },
+                { txt: "Administrar doble dosis de Ibuprofeno.", correct: false },
+                { txt: "Aplicar solo compresas frías.", correct: false }
+            ],
+            doubt: "Siento que esa pastilla no me va a hacer nada...",
+            psycho: [
+                { txt: "Tiene razón, voy a sugerir un medicamento más potente acorde a su dolor.", score: 0.1, feed: "Correcto. Abogacía por el paciente." },
+                { txt: "Es lo que hay.", score: -0.1, feed: "Incorrecto." },
+                { txt: "Todo está en la mente.", score: -0.1, feed: "Incorrecto." },
+                { txt: "Tómese dos entonces.", score: -0.1, feed: "Ilegal. No puedes prescribir." }
+            ],
+            biblio: "OMS: Dolor severo (7-10) requiere subir en la escalera analgésica, asociando opioides a los no-opioides."
+        },
+        // PREGUNTA 4: Higiene
+        {
+            scenario: "Vas a administrar analgesia IV. ¿Cuál es el momento correcto para la higiene de manos?",
+            level: "Básico",
+            options: [
+                { txt: "Solo después de tocar al paciente.", correct: false },
+                { txt: "Antes de realizar tarea aséptica (preparar/administrar).", correct: true, feed: "Correcto. Momento 2 de la OMS." },
+                { txt: "No hace falta si uso guantes.", correct: false },
+                { txt: "Solo al entrar a la habitación.", correct: false }
+            ],
+            doubt: "¿Se lavó las manos?",
+            psycho: [
+                { txt: "Sí, claro.", score: 0, feed: "Cortante." },
+                { txt: "Tiene toda la razón. Me lavaré ahora mismo frente a usted para su seguridad.", score: 0.1, feed: "Correcto. Refuerza confianza." },
+                { txt: "No sea desconfiada.", score: -0.1, feed: "Defensivo." },
+                { txt: "Los guantes están limpios.", score: -0.1, feed: "Falso." }
+            ],
+            biblio: "OMS 5 Momentos: Antes de una tarea limpia/aséptica es crítico para prevenir infecciones asociadas a catéteres."
+        },
+        // PREGUNTA 5: Vías de Administración
+        {
+            scenario: "María tiene náuseas y vómitos. Tiene indicado Tramadol Oral. ¿Qué haces?",
+            level: "Básico",
+            options: [
+                { txt: "Dar la pastilla con poca agua.", correct: false },
+                { txt: "Solicitar cambio a vía Parenteral (IV) debido a la intolerancia oral.", correct: true, feed: "Correcto. Si hay vómitos, la vía oral no es efectiva ni segura." },
+                { txt: "Machacar la pastilla.", correct: false },
+                { txt: "Esperar a que se le pasen las náuseas.", correct: false }
+            ],
+            doubt: "Si tomo agua voy a vomitar...",
+            psycho: [
+                { txt: "Intente, haga un esfuerzo.", score: -0.1, feed: "Riesgo de aspiración." },
+                { txt: "No se preocupe, no la forzaré. Le pondremos la medicina por el suero.", score: 0.1, feed: "Correcto." },
+                { txt: "Es solo mental.", score: -0.1, feed: "Incorrecto." },
+                { txt: "Vomite si necesita.", score: 0, feed: "Poco útil." }
+            ],
+            biblio: "Farmacocinética: La absorción oral se ve comprometida en emesis. Se debe rotar la vía de administración."
+        },
+        // PREGUNTA 6: Administración Tramadol (Velocidad)
+        {
+            scenario: "Se indica Tramadol 50mg IV. ¿Cuál es la técnica correcta para evitar náuseas severas?",
+            level: "Intermedio",
+            options: [
+                { txt: "Bolo directo en 10 segundos.", correct: false },
+                { txt: "Diluido en 50-100ml SS y pasar en 20-30 minutos.", correct: true, feed: "Correcto. La infusión lenta previene la activación de la zona gatillo del vómito." },
+                { txt: "Mezclar con Heparina.", correct: false },
+                { txt: "Administrar IM en el muslo.", correct: false }
+            ],
+            doubt: "Me da miedo marearme mucho...",
+            psycho: [
+                { txt: "El mareo es inevitable.", score: -0.1, feed: "Falso." },
+                { txt: "Lo pasaremos muy lentamente diluido en suero, eso reduce muchísimo el riesgo de mareo.", score: 0.1, feed: "Correcto. Técnica tranquilizadora." },
+                { txt: "Cierre los ojos y ya.", score: 0, feed: "Poco empático." },
+                { txt: "No piense en eso.", score: -0.1, feed: "Incorrecto." }
+            ],
+            biblio: "Farmacología: Los opioides IV en bolo rápido causan alta incidencia de náuseas y vómitos centrales."
+        },
+        // PREGUNTA 7: Cálculo de Dosis
+        {
+            scenario: "Ampolla Tramadol: 100mg/2ml. Orden: 25mg. ¿Cuántos ml tomas?",
+            level: "Intermedio",
+            options: [
+                { txt: "1 ml", correct: false },
+                { txt: "0.5 ml", correct: true, feed: "Correcto. Si 2ml son 100mg, 1ml son 50mg, y 0.5ml son 25mg." },
+                { txt: "0.2 ml", correct: false },
+                { txt: "2 ml", correct: false }
+            ],
+            doubt: "¿Esa cantidad tan chiquita me va a hacer efecto?",
+            psycho: [
+                { txt: "Es poco, pero es lo que ordenaron.", score: 0, feed: "Dudoso." },
+                { txt: "Es una dosis potente concentrada. Es la cantidad exacta calculada para su peso y dolor.", score: 0.1, feed: "Correcto. Seguridad." },
+                { txt: "Si quiere le pongo más.", score: -0.1, feed: "Negligencia grave." },
+                { txt: "Usted no sabe de dosis.", score: -0.1, feed: "Grosero." }
+            ],
+            biblio: "Cálculo: Regla de tres. (25mg * 2ml) / 100mg = 0.5ml."
+        },
+        // PREGUNTA 8: Efecto Techo AINEs
+        {
+            scenario: "El dolor persiste. María pide 'más Ketorolaco'. Ya recibió la dosis máxima diaria. ¿Qué sucede si das más?",
+            level: "Intermedio",
+            options: [
+                { txt: "Mejorará el dolor significativamente.", correct: false },
+                { txt: "Efecto Techo: No mejora el dolor, pero aumenta toxicidad renal/gástrica.", correct: true, feed: "Correcto. Los AINEs tienen techo analgésico." },
+                { txt: "Se dormirá.", correct: false },
+                { txt: "Le dará alergia.", correct: false }
+            ],
+            doubt: "¡Por favor, póngame otra inyección igual!",
+            psycho: [
+                { txt: "No puedo, está prohibido.", score: 0, feed: "Autoritario." },
+                { txt: "Ese medicamento tiene un límite seguro. Si le doy más, daño sus riñones sin quitar el dolor. Usaremos otro tipo de medicina.", score: 0.1, feed: "Correcto. Educación sanitaria." },
+                { txt: "Bueno, solo una más.", score: -0.1, feed: "Negligente." },
+                { txt: "Cállese por favor.", score: -0.1, feed: "Abuso." }
+            ],
+            biblio: "Farmacología: A diferencia de los opioides puros, los AINEs tienen 'Efecto Techo'. Superar la dosis solo aumenta efectos adversos."
+        },
+        // PREGUNTA 9: Interacción
+        {
+            scenario: "María toma Warfarina (Anticoagulante) en casa. ¿Qué riesgo tiene el uso prolongado de AINEs?",
+            level: "Intermedio",
+            options: [
+                { txt: "Ninguno.", correct: false },
+                { txt: "Aumento significativo del riesgo de sangrado (desplazamiento proteico + antiagregación).", correct: true, feed: "Correcto. AINEs + Warfarina es una interacción peligrosa." },
+                { txt: "Disminución del efecto anticoagulante.", correct: false },
+                { txt: "Riesgo de trombosis.", correct: false }
+            ],
+            doubt: "¿Puedo seguir tomando mi pastilla para la sangre?",
+            psycho: [
+                { txt: "Sí, tómela con todo.", score: -0.1, feed: "Peligroso." },
+                { txt: "Debemos ajustar la dosis y vigilar sus tiempos de coagulación porque los calmantes pueden potenciar el sangrado.", score: 0.1, feed: "Correcto." },
+                { txt: "No sé, pregunte al médico.", score: 0, feed: "Inseguro." },
+                { txt: "Mejor no tome nada.", score: -0.1, feed: "Impreciso." }
+            ],
+            biblio: "Interacciones: Los AINEs desplazan a la warfarina de su unión a proteínas y dañan la mucosa gástrica, elevando el INR y riesgo hemorrágico."
+        },
+        // PREGUNTA 10: Estreñimiento por Opioides
+        {
+            scenario: "María lleva 3 días con Tramadol. Refiere no haber evacuado. ¿Qué acción preventiva debió tomarse?",
+            level: "Intermedio",
+            options: [
+                { txt: "Ninguna, es normal.", correct: false },
+                { txt: "Dieta rica en fibra, hidratación y laxantes profilácticos.", correct: true, feed: "Correcto. El estreñimiento es un efecto universal de los opioides." },
+                { txt: "Enemas diarios.", correct: false },
+                { txt: "Suspender analgesia.", correct: false }
+            ],
+            doubt: "Me siento hinchada y no voy al baño...",
+            psycho: [
+                { txt: "Es por la comida del hospital.", score: 0, feed: "Evasivo." },
+                { txt: "Es un efecto de los calmantes. Vamos a aumentar el agua y le daré un laxante suave para ayudarla.", score: 0.1, feed: "Correcto." },
+                { txt: "Aguántese.", score: -0.1, feed: "Mal." },
+                { txt: "Deje de comer.", score: -0.1, feed: "Incorrecto." }
+            ],
+            biblio: "Cuidados: El íleo paralítico o estreñimiento por opioides no genera tolerancia; siempre debe tratarse profilácticamente."
+        },
+        // PREGUNTA 11: Depresión Respiratoria
+        {
+            scenario: "Encuentras a María somnolienta, FR 8 rpm y pupilas puntiformes. ¿Qué sospechas?",
+            level: "Intermedio",
+            options: [
+                { txt: "Sueño profundo reparador.", correct: false },
+                { txt: "Intoxicación por Opioides (Sobredosis).", correct: true, feed: "Correcto. Triada: Depresión respiratoria, Miosis, Coma." },
+                { txt: "Reacción alérgica.", correct: false },
+                { txt: "Hipoglucemia.", correct: false }
+            ],
+            doubt: "(Paciente no responde, respira muy lento...)",
+            psycho: [
+                { txt: "(Sacudir suavemente) ¡María, respire!", score: 0.1, feed: "Correcto. Estímulo verbal/táctil inicial." },
+                { txt: "Déjenla dormir.", score: -0.1, feed: "Mortal." },
+                { txt: "Gritar por ayuda sin tocarla.", score: 0, feed: "Lento." },
+                { txt: "Ir a buscar el expediente.", score: -0.1, feed: "Pierdes tiempo." }
+            ],
+            biblio: "Urgencias: FR < 10 rpm con uso de opioides es una emergencia médica."
+        },
+        // PREGUNTA 12: Antídoto
+        {
+            scenario: "Confirmada la depresión respiratoria por Opioides. ¿Qué fármaco preparas?",
+            level: "Intermedio",
+            options: [
+                { txt: "Flumazenil.", correct: false },
+                { txt: "Naloxona.", correct: true, feed: "Correcto. Es el antagonista puro de los receptores opioides." },
+                { txt: "Adrenalina.", correct: false },
+                { txt: "Atropina.", correct: false }
+            ],
+            doubt: "(Familiar pregunta) ¿Se va a morir?",
+            psycho: [
+                { txt: "Probablemente.", score: -0.1, feed: "Cruel." },
+                { txt: "Estamos actuando rápido para revertir el efecto del medicamento. Por favor espere afuera mientras trabajamos.", score: 0.1, feed: "Correcto. Control de crisis." },
+                { txt: "Fue culpa del médico.", score: -0.1, feed: "Poco ético." },
+                { txt: "No sé qué pasa.", score: -0.1, feed: "Inseguro." }
+            ],
+            biblio: "Farmacología: La Naloxona revierte la depresión respiratoria en minutos. Vida media corta, puede requerir dosis repetidas."
+        },
+        // PREGUNTA 13: Dolor Irruptivo
+        {
+            scenario: "María está estable, pero al moverse bruscamente tiene un pico de dolor 9/10 que cede en minutos. ¿Cómo se llama esto?",
+            level: "Avanzado",
+            options: [
+                { txt: "Dolor Crónico.", correct: false },
+                { txt: "Dolor Irruptivo (Incidentales).", correct: true, feed: "Correcto. Dolor transitorio intenso sobre un dolor basal controlado." },
+                { txt: "Adicción.", correct: false },
+                { txt: "Hiperalgesia.", correct: false }
+            ],
+            doubt: "Estaba bien y de repente vi las estrellas al moverme...",
+            psycho: [
+                { txt: "No se mueva nunca.", score: -0.1, feed: "Incorrecto." },
+                { txt: "Es un pico de dolor incidental. Podemos planificar una 'dosis de rescate' antes de que se vaya a bañar o mover.", score: 0.1, feed: "Correcto. Anticipación." },
+                { txt: "Es su imaginación.", score: -0.1, feed: "Mal." },
+                { txt: "Ya pasará.", score: 0, feed: "Poco útil." }
+            ],
+            biblio: "Clínica: El dolor incidental requiere dosis de rescate de acción rápida (10-15% de dosis diaria)."
+        },
+        // PREGUNTA 14: Analgesia Multimodal
+        {
+            scenario: "Para mejorar el control del dolor y reducir dosis de opioides, el médico añade Paracetamol. ¿Cuál es el racional?",
+            level: "Avanzado",
+            options: [
+                { txt: "No sirve de nada.", correct: false },
+                { txt: "Sinergia Multimodal (Ahorrador de opioides).", correct: true, feed: "Correcto. Ataca el dolor por vías diferentes, permitiendo bajar dosis de opioides y sus efectos adversos." },
+                { txt: "El Paracetamol anula al Tramadol.", correct: false },
+                { txt: "Aumentar el costo.", correct: false }
+            ],
+            doubt: "¿Para qué tanta pastilla si una es suave?",
+            psycho: [
+                { txt: "Tómese todo y ya.", score: -0.1, feed: "Autoritario." },
+                { txt: "Al combinar una suave con una fuerte, atacamos el dolor desde dos frentes y usted tiene menos efectos secundarios.", score: 0.1, feed: "Correcto. Educación." },
+                { txt: "No sé, orden médica.", score: 0, feed: "Pobre." },
+                { txt: "Si quiere no se la toma.", score: -0.1, feed: "Mal." }
+            ],
+            biblio: "Estrategia: La analgesia multimodal es el estándar de oro en recuperación post-quirúrgica (ERAS)."
+        },
+        // PREGUNTA 15: Placebo
+        {
+            scenario: "Un residente sugiere: 'Dale solución salina (Placebo) para ver si finge'. ¿Qué haces?",
+            level: "Avanzado",
+            options: [
+                { txt: "Hacerlo para confirmar diagnóstico.", correct: false },
+                { txt: "Rechazar la orden. El uso de placebos en dolor clínico es no ético y destruye la confianza.", correct: true, feed: "Correcto. El dolor es lo que el paciente dice que es." },
+                { txt: "Hacerlo pero decirle a la paciente.", correct: false },
+                { txt: "Mezclarlo con un poquito de medicina.", correct: false }
+            ],
+            doubt: "¿Confía en que me duele, verdad?",
+            psycho: [
+                { txt: "A veces dudo.", score: -0.1, feed: "Destruye relación." },
+                { txt: "Por supuesto. El dolor es real y lo trataremos como tal. No usamos engaños aquí.", score: 0.1, feed: "Correcto. Ética." },
+                { txt: "No importa lo que yo crea.", score: 0, feed: "Frío." },
+                { txt: "Mmmh...", score: 0, feed: "Sospechoso." }
+            ],
+            biblio: "Ética: Las guías internacionales prohíben el uso de placebos para 'testear' dolor."
+        },
+        // PREGUNTA 16: Toxicidad Hepática
+        {
+            scenario: "María tomó 8 gramos de Paracetamol en 24h por su cuenta. ¿Cuál es el riesgo principal?",
+            level: "Avanzado",
+            options: [
+                { txt: "Fallo Renal.", correct: false },
+                { txt: "Hepatotoxicidad Fulminante (Necrosis hepática).", correct: true, feed: "Correcto. Dosis > 4g/día satura el glutatión hepático." },
+                { txt: "Gastritis.", correct: false },
+                { txt: "Bradicardia.", correct: false }
+            ],
+            doubt: "Pensé que el Paracetamol era inofensivo...",
+            psycho: [
+                { txt: "Es usted una irresponsable.", score: -0.1, feed: "Juzga." },
+                { txt: "Es un error común. Vamos a vigilar su hígado con exámenes de sangre. En el futuro, nunca pase de 4 gramos al día.", score: 0.1, feed: "Correcto. Sin juzgar, educa." },
+                { txt: "Sí, es como dulces.", score: -0.1, feed: "Falso." },
+                { txt: "Ya ni modo.", score: -0.1, feed: "Fatalista." }
+            ],
+            biblio: "Toxicología: El metabolito NAPQI del paracetamol es hepatotóxico. Antídoto: N-acetilcisteína."
+        },
+        // PREGUNTA 17: Coadyuvantes (Dolor Neuropático)
+        {
+            scenario: "Si María desarrollara dolor tipo 'corriente eléctrica' crónico. ¿Qué fármaco sería útil añadir?",
+            level: "Avanzado",
+            options: [
+                { txt: "Más AINEs.", correct: false },
+                { txt: "Gabapentina o Pregabalina.", correct: true, feed: "Correcto. Son neuromoduladores indicados en dolor neuropático." },
+                { txt: "Antibióticos.", correct: false },
+                { txt: "Diuréticos.", correct: false }
+            ],
+            doubt: "¿Me darán medicina para la epilepsia? ¡No soy epiléptica!",
+            psycho: [
+                { txt: "Cállese y tome.", score: -0.1, feed: "Mal." },
+                { txt: "Estos medicamentos se crearon para eso, pero descubrimos que son excelentes para calmar los nervios dolorosos. No es porque tenga epilepsia.", score: 0.1, feed: "Correcto. Educación." },
+                { txt: "Es lo que dice la receta.", score: 0, feed: "Mecánico." },
+                { txt: "Sí, ahora es epiléptica.", score: -0.1, feed: "Mentira." }
+            ],
+            biblio: "Farmacoterapia: El dolor neuropático no responde bien a analgésicos convencionales."
+        },
+        // PREGUNTA 18: Educación al Alta
+        {
+            scenario: "Al alta, ¿qué instrucción es vital sobre los opioides en casa?",
+            level: "Avanzado",
+            options: [
+                { txt: "Puede conducir maquinaria pesada.", correct: false },
+                { txt: "No conducir, evitar alcohol, y guardarlos lejos de niños.", correct: true, feed: "Correcto. Seguridad en el hogar." },
+                { txt: "Compartirlos con familiares si les duele algo.", correct: false },
+                { txt: "Tomarlos con el estómago vacío.", correct: false }
+            ],
+            doubt: "¿Puedo manejar mi moto de regreso?",
+            psycho: [
+                { txt: "Sí, con cuidado.", score: -0.1, feed: "Peligroso." },
+                { txt: "Definitivamente no. Sus reflejos están lentos por la medicina. Necesita que alguien la lleve.", score: 0.1, feed: "Correcto." },
+                { txt: "Si se siente bien...", score: 0, feed: "Riesgoso." },
+                { txt: "Bajo su riesgo.", score: -0.1, feed: "Irresponsable." }
+            ],
+            biblio: "Educación: Los opioides disminuyen los tiempos de reacción y causan somnolencia."
+        },
+        // PREGUNTA 19: Rotación de Opioides
+        {
+            scenario: "Si María desarrolla tolerancia al Tramadol (necesita más dosis para mismo efecto). ¿Qué se hace?",
+            level: "Avanzado",
+            options: [
+                { txt: "Subir dosis infinitamente.", correct: false },
+                { txt: "Rotación de Opioides (Cambiar a otro fármaco calculando equianalgesia).", correct: true, feed: "Correcto. Restablece la sensibilidad de receptores." },
+                { txt: "Suspender todo.", correct: false },
+                { txt: "Acusarla de adicta.", correct: false }
+            ],
+            doubt: "¿Me estoy volviendo adicta?",
+            psycho: [
+                { txt: "Sí, tenga cuidado.", score: -0.1, feed: "Alarmista." },
+                { txt: "No, su cuerpo se acostumbró. Es normal biológicamente (tolerancia), no es adicción psicológica. Ajustaremos el tratamiento.", score: 0.1, feed: "Correcto. Diferencia tolerancia de adicción." },
+                { txt: "Probablemente.", score: 0, feed: "Inseguro." },
+                { txt: "No pregunte eso.", score: -0.1, feed: "Mal." }
+            ],
+            biblio: "Conceptos: Tolerancia es fisiológica; Adicción es conductual/psicológica."
+        },
+        // PREGUNTA 20: Cierre
+        {
+            scenario: "Última valoración: María se va a casa con dolor 2/10, deambulando y tolerando dieta. ¿Se cumplió el objetivo?",
+            level: "Avanzado",
+            options: [
+                { txt: "No, porque aún tiene dolor 2/10.", correct: false },
+                { txt: "Sí, el dolor es funcional y permite las actividades de la vida diaria.", correct: true, feed: "Correcto. El objetivo realista es el confort funcional, no siempre dolor cero absoluto." },
+                { txt: "Depende del clima.", correct: false },
+                { txt: "No sé.", correct: false }
+            ],
+            doubt: "¿Estaré bien sola?",
+            psycho: [
+                { txt: "No sé, suerte.", score: -0.1, feed: "Abandono." },
+                { txt: "Lleva un buen plan, sabe los signos de alarma y cómo tomar su medicina. Lo hará muy bien.", score: 0.1, feed: "Correcto. Empoderamiento final." },
+                { txt: "Busque una enfermera privada.", score: 0, feed: "Innecesario." },
+                { txt: "Llámeme al celular personal.", score: -0.1, feed: "Límites profesionales." }
+            ],
+            biblio: "Alta: El manejo exitoso se define por funcionalidad y confort, no solo por un número en la escala."
+        }
+    ];
+
+    // --- VARIABLES ---
+    let state = {
+        idx: 0,
+        score: 0, // Max 10. (20 Qs * 0.4 Clinical) + (20 Qs * 0.1 Psycho) = 10.0
+        timer: 1200, 
+        interval: null,
+        psychoDone: false
+    };
+
+    // --- FUNCIONES ---
+    function startGame() {
+        document.getElementById('modal-start').style.display = 'none';
+        state.interval = setInterval(updateTimer, 1000);
+        loadQuestion(0);
+    }
+
+    function updateTimer() {
+        state.timer--;
+        const mins = Math.floor(state.timer / 60);
+        const secs = state.timer % 60;
+        document.getElementById('timer-text').innerText = `${mins}:${secs < 10 ? '0'+secs : secs}`;
+        
+        const pct = (state.timer / 1200) * 100;
+        const bar = document.getElementById('timer-bar');
+        bar.style.width = pct + "%";
+        
+        if(pct < 30) bar.style.backgroundPosition = "100% 0%"; 
+        else if(pct < 60) bar.style.backgroundPosition = "50% 0%";
+        else bar.style.backgroundPosition = "0% 0%";
+
+        if(state.timer <= 0) endGame(true);
+    }
+
+    function loadQuestion(i) {
+        if(i >= db.length) { endGame(false); return; }
+        
+        state.idx = i;
+        state.psychoDone = false;
+        
+        const data = db[i];
+        
+        // UI Text
+        document.getElementById('q-idx').innerText = i + 1;
+        document.getElementById('q-level').innerText = data.level;
+        document.getElementById('q-text').innerText = data.scenario;
+        document.getElementById('patient-doubt').innerText = `"${data.doubt}"`;
+        document.getElementById('patient-face').src = imgConcern;
+        
+        // Reset Comodines Visuals
+        document.querySelectorAll('.lifeline-btn').forEach(b => {
+            if(!b.classList.contains('used')) b.style.opacity = "1";
+        });
+        
+        // Reset Psycho Button
+        const btnPsy = document.getElementById('btn-psycho');
+        btnPsy.className = "btn-intervene";
+        btnPsy.innerHTML = "<span>💬</span> Intervención Verbal";
+        btnPsy.onclick = openPsycho;
+
+        // Render Opciones Clínicas
+        const list = document.getElementById('options-list');
+        list.innerHTML = "";
+        data.options.forEach((opt, idx) => {
+            const btn = document.createElement('div');
+            btn.className = "option-btn";
+            btn.innerHTML = `<div class="option-letter">${String.fromCharCode(65+idx)}</div> ${opt.txt}`;
+            btn.dataset.correct = opt.correct;
+            btn.onclick = () => handleAnswer(opt);
+            list.appendChild(btn);
+        });
+    }
+
+    function openPsycho() {
+        if(state.psychoDone) return;
+        const data = db[state.idx];
+        document.getElementById('psycho-question').innerText = data.doubt;
+        
+        const grid = document.getElementById('psycho-options');
+        grid.innerHTML = "";
+        
+        // Randomizar orden psycho
+        const mixed = [...data.psycho].sort(() => Math.random() - 0.5);
+
+        mixed.forEach(opt => {
+            const div = document.createElement('div');
+            div.className = "psycho-opt";
+            div.innerText = opt.txt;
+            div.onclick = () => resolvePsycho(opt);
+            grid.appendChild(div);
+        });
+
+        document.getElementById('modal-psycho').style.display = "flex";
+    }
+
+    function resolvePsycho(opt) {
+        // Puntuación Psycho: +0.1 si correcta, -0.1 incorrecta
+        state.score += opt.score;
+        state.psychoDone = true;
+        document.getElementById('modal-psycho').style.display = "none";
+        
+        const btn = document.getElementById('btn-psycho');
+        btn.className = "btn-intervene done";
+        btn.innerHTML = "✅ Intervención Realizada";
+        btn.onclick = null; 
+
+        if(opt.score < 0) alert("Feedback Comunicación: " + opt.feed);
+    }
+
+    function handleAnswer(opt) {
+        if(!state.psychoDone) {
+            alert("⚠️ ALERTA: La comunicación es prioritaria. Realiza la Intervención Verbal antes de medicar.");
+            return;
+        }
+
+        // Puntuación Clínica: +0.4 correcta
+        if(opt.correct) state.score += 0.4;
+
+        // Mostrar Feedback
+        const modal = document.getElementById('modal-feedback');
+        document.getElementById('fb-icon').innerText = opt.correct ? "🎉" : "⚠️";
+        document.getElementById('fb-title').innerText = opt.correct ? "¡Correcto!" : "Incorrecto";
+        document.getElementById('fb-title').style.color = opt.correct ? "var(--secondary)" : "var(--danger)";
+        document.getElementById('fb-desc').innerText = opt.feed || (opt.correct ? "Bien razonado." : "Revisa los protocolos de seguridad.");
+        document.getElementById('fb-card').style.borderTopColor = opt.correct ? "var(--secondary)" : "var(--danger)";
+        
+        if(opt.correct) document.getElementById('patient-face').src = imgHappy;
+        else document.getElementById('patient-face').src = imgPain;
+
+        modal.style.display = "flex";
+    }
+
+    function nextQuestion() {
+        document.getElementById('modal-feedback').style.display = "none";
+        loadQuestion(state.idx + 1);
+    }
+
+    function useLifeline(type) {
+        const btn = document.getElementById(`life-${type}`);
+        if(btn.classList.contains('used')) return;
+        
+        if(type === 'skip') {
+            btn.classList.add('used');
+            loadQuestion(state.idx + 1);
+            return;
+        }
+
+        state.score -= 0.5; // Costo
+        btn.classList.add('used');
+
+        if(type === '5050') {
+            const opts = document.querySelectorAll('.option-btn');
+            let removed = 0;
+            opts.forEach(o => {
+                if(o.dataset.correct === "false" && removed < 2) {
+                    o.style.opacity = "0.2";
+                    o.style.pointerEvents = "none";
+                    removed++;
+                }
+            });
+        }
+
+        if(type === 'biblio') {
+            document.getElementById('biblio-text').innerText = db[state.idx].biblio;
+            document.getElementById('modal-biblio-content').style.display = "flex";
+        }
+    }
+
+    function closeBiblio() {
+        document.getElementById('modal-biblio-content').style.display = "none";
+    }
+
+    function endGame(timeout) {
+        clearInterval(state.interval);
+        document.getElementById('modal-feedback').style.display = "none";
+        document.getElementById('modal-end').style.display = "flex";
+        
+        let final = state.score < 0 ? 0 : state.score;
+        if(final > 10) final = 10;
+
+        document.getElementById('final-score').innerText = final.toFixed(1) + "/10";
+        
+        let msg = "";
+        if(timeout) msg = "⏰ Se acabó el tiempo. ";
+        if(final >= 9) msg += "¡Excelente desempeño! Dominio profesional de la farmacología.";
+        else if(final >= 7) msg += "Buen trabajo. Revisa los detalles de seguridad.";
+        else msg += "Se requiere refuerzo urgente en farmacología y seguridad del paciente.";
+
+        document.getElementById('final-msg').innerText = msg;
+    }
+
+</script>
+</body>
+</html>
